@@ -1,6 +1,8 @@
+import { sendWelcomeEmail } from "../email/emailHandle.js";
 import { generateToken } from "../lib/utils.js";
 import User from "../model/user.model.js";
 import bcrypt from "bcryptjs";
+import "dotenv/config"
 
 export const signup = async (req, res) => {
   const { fullname, email, password } = req.body;
@@ -37,14 +39,24 @@ export const signup = async (req, res) => {
     });
 
     if (newUser) {
+       const savedUser = await newUser.save();
       generateToken(newUser._id, res);
-      await newUser.save();
       res.status(201).json({
         id: newUser._id,
         fullname: newUser.fullname,
         email: newUser.email,
         profilePic: newUser.profilePicture,
       });
+
+      try {
+        await sendWelcomeEmail(savedUser.email,savedUser.fullname,process.env.CLIENT_URL)
+
+      } catch (error) {
+        console.error("failed to send email in from controller",error)
+        
+      }
+
+
     } else {
       res.status(401).json({ message: "invalid user" });
     }
