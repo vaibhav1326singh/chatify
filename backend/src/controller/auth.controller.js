@@ -67,3 +67,40 @@ export const signup = async (req, res) => {
       .json({ message: "internal error had occured in signup contoller" });
   }
 };
+
+
+export const login = async (req,res) => {
+  const {email , password} = req.body
+
+  try {
+    if(!email || !password){
+      return res.status(400).json({message:"enter all the fields"})
+    }
+    const user =await User.findOne({email})
+    if(!user){
+      return res.status(401).json({message:"invalid credintials"})
+    }
+    const isPasswordCorrect = await bcrypt.compare(password,user.password)
+    if(!isPasswordCorrect) return res.status(401).json({message:"invalid credentials"})
+      
+    generateToken(user._id,res)
+
+    res.status(201).json({
+        id: user._id,
+        fullname: user.fullname,
+        email: user.email,
+        profilePic: user.profilePicture,
+      })
+
+  } catch (error) {
+    console.log("error had occurin login controller", error);
+    res
+      .status(500)
+      .json({ message: "internal error had occured in login contoller" });
+  }
+}
+
+export const logout = async (req,res) =>{
+  res.cookie("jwt","",{maxAge:0})
+  res.status(200).json({message:"logged out successfully"})
+}
