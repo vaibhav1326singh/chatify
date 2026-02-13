@@ -1,8 +1,9 @@
 import { sendWelcomeEmail } from "../email/emailHandle.js";
+import cloudinary from "../lib/cloudinay.js";
 import { generateToken } from "../lib/utils.js";
 import User from "../model/user.model.js";
 import bcrypt from "bcryptjs";
-import "dotenv/config"
+import "dotenv/config";
 
 export const signup = async (req, res) => {
   const { fullname, email, password } = req.body;
@@ -23,7 +24,7 @@ export const signup = async (req, res) => {
       return res.status(400).json({ message: "enter the valid email" });
     }
 
-    const user = await User.findOne({email});
+    const user = await User.findOne({ email });
 
     if (user) {
       return res.status(404).json({ message: "email is already registered" });
@@ -39,7 +40,7 @@ export const signup = async (req, res) => {
     });
 
     if (newUser) {
-       const savedUser = await newUser.save();
+      const savedUser = await newUser.save();
       generateToken(newUser._id, res);
       res.status(201).json({
         id: newUser._id,
@@ -49,14 +50,14 @@ export const signup = async (req, res) => {
       });
 
       try {
-        await sendWelcomeEmail(savedUser.email,savedUser.fullname,process.env.CLIENT_URL)
-
+        await sendWelcomeEmail(
+          savedUser.email,
+          savedUser.fullname,
+          process.env.CLIENT_URL,
+        );
       } catch (error) {
-        console.error("failed to send email in from controller",error)
-        
+        console.error("failed to send email in from controller", error);
       }
-
-
     } else {
       res.status(401).json({ message: "invalid user" });
     }
@@ -68,39 +69,65 @@ export const signup = async (req, res) => {
   }
 };
 
-
-export const login = async (req,res) => {
-  const {email , password} = req.body
+export const login = async (req, res) => {
+  const { email, password } = req.body;
 
   try {
-    if(!email || !password){
-      return res.status(400).json({message:"enter all the fields"})
+    if (!email || !password) {
+      return res.status(400).json({ message: "enter all the fields" });
     }
-    const user =await User.findOne({email})
-    if(!user){
-      return res.status(401).json({message:"invalid credintials"})
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(401).json({ message: "invalid credintials" });
     }
-    const isPasswordCorrect = await bcrypt.compare(password,user.password)
-    if(!isPasswordCorrect) return res.status(401).json({message:"invalid credentials"})
-      
-    generateToken(user._id,res)
+    const isPasswordCorrect = await bcrypt.compare(password, user.password);
+    if (!isPasswordCorrect)
+      return res.status(401).json({ message: "invalid credentials" });
+
+    generateToken(user._id, res);
 
     res.status(201).json({
-        id: user._id,
-        fullname: user.fullname,
-        email: user.email,
-        profilePic: user.profilePicture,
-      })
-
+      id: user._id,
+      fullname: user.fullname,
+      email: user.email,
+      profilePic: user.profilePicture,
+    });
   } catch (error) {
     console.log("error had occurin login controller", error);
     res
       .status(500)
       .json({ message: "internal error had occured in login contoller" });
   }
-}
+};
 
-export const logout = async (req,res) =>{
-  res.cookie("jwt","",{maxAge:0})
-  res.status(200).json({message:"logged out successfully"})
-}
+export const logout = async (_, res) => {
+  res.cookie("jwt", "", { maxAge: 0 });
+  res.status(200).json({ message: "logged out successfully" });
+};
+
+export const updateProfile = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    if (!userId) {
+      return res.status(401).json({ message: "not the loggedin user" });
+    }
+  
+    const { profilePicture } = req.body;
+    if (!profilePicture) {
+      return res.status(401).json({ message: "profile pic is needed" });
+    }
+  
+    const newprofielPic = await cloudinary.uploader.upload(profilePicture);
+  
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { profilePic: newprofielPic.secure_url },
+      { new: true },
+    );
+  
+    res.status(200).json(updatedUser, { message: "profile photo is updated" });
+  } catch (error) {
+    console.log("error in updated controller",error)
+    return res.status(500).json({message:"internal server error in updated controller"})
+  }
+};
